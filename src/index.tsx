@@ -7,6 +7,7 @@ import {
   generateFilePath,
   getRealPath,
   getVideoMetaData,
+  getVideoThumnail,
 } from './utils';
 
 export {
@@ -21,6 +22,7 @@ export {
   generateFilePath,
   getRealPath,
   getVideoMetaData,
+  getVideoThumnail,
 };
 export default {
   Video,
@@ -32,4 +34,5 @@ export default {
   generateFilePath,
   getRealPath,
   getVideoMetaData,
+  getVideoThumnail,
 };

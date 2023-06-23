@@ -266,6 +266,41 @@ RCT_EXPORT_METHOD(
         }
     }
 
+- (NSString *)saveImage:(UIImage *)image withName:(NSString *)name {
+    NSData *data = UIImageJPEGRepresentation(image, 1.0);
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSArray *directories = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentsDirectory = directories[0];
+    NSString *fullPath = [documentsDirectory stringByAppendingPathComponent:name];
+    [fileManager createFileAtPath:fullPath contents:data attributes:nil];
+    return fullPath;
+}
+
+RCT_EXPORT_METHOD(
+    getVideoThumnail: (NSString*) filePath
+    resolver: (RCTPromiseResolveBlock) resolve
+    rejecter: (RCTPromiseRejectBlock) reject) {
+  @try {
+    AVURLAsset *asset = [AVURLAsset assetWithURL:[NSURL URLWithString:filePath]];
+    AVAssetImageGenerator *generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:asset];
+    generator.appliesPreferredTrackTransform = true;
+    
+    CGImageRef imageRef = [generator copyCGImageAtTime:CMTimeMake(1, 1) actualTime:nil error:nil];
+    UIImage *image = [UIImage imageWithCGImage:imageRef];
+    NSDate *date = [NSDate date];
+    NSString* uri = [self saveImage:image withName:[NSString stringWithFormat:@"%ld.webp", (long)@([date timeIntervalSince1970]).integerValue]];
+    
+    [ImageCompressor getAbsoluteImagePath:uri completionHandler:^(NSString *absoluteImagePath) {
+      resolve(absoluteImagePath);
+    }];
+  }
+  @catch (NSException *exception) {
+      reject(exception.name, exception.reason, nil);
+  }
+}
+
+#define FourCC2Str(code) (char[5]){(code >> 24) & 0xFF, (code >> 16) & 0xFF, (code >> 8) & 0xFF, code & 0xFF, 0}
+
 
 RCT_EXPORT_METHOD(
     getVideoMetaData: (NSString*) filePath
@@ -291,6 +326,7 @@ RCT_EXPORT_METHOD(
             NSString *fileSizeString = [@(fileSize) stringValue];
 
               NSMutableDictionary *result = [NSMutableDictionary new];
+              NSMutableDictionary *video = [NSMutableDictionary new];
               NSDictionary *assetOptions = @{AVURLAssetPreferPreciseDurationAndTimingKey: @YES};
               AVURLAsset *asset = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:absoluteImagePath] options:assetOptions];\
               AVAssetTrack *avAsset = [[asset tracksWithMediaType:AVMediaTypeVideo] objectAtIndex:0];
@@ -298,12 +334,32 @@ RCT_EXPORT_METHOD(
               NSString *extension = [[absoluteImagePath lastPathComponent] pathExtension];
               CMTime time = [asset duration];
               int seconds = ceil(time.value/time.timescale);
-              [result setObject:[NSString stringWithFormat: @"%.2f", size.width] forKey:@"width"];
-              [result setObject:[NSString stringWithFormat: @"%.2f", size.height] forKey:@"height"];
-              [result setObject:extension forKey:@"extension"];
-              [result setObject:fileSizeString forKey:@"size"];
-              [result setObject:[@(seconds) stringValue] forKey:@"duration"];
+              [video setObject:@(size.width) forKey:@"width"];
+              [video setObject:@(size.height) forKey:@"height"];
+              [video setObject:extension forKey:@"extension"];
+              [video setObject:fileSizeString forKey:@"size"];
+              [video setObject:@(seconds) forKey:@"duration"];
+              [video setObject:@(avAsset.estimatedDataRate) forKey:@"bitRate"];
+          
               NSArray *keys = [NSArray arrayWithObjects:@"commonMetadata", nil];
+          
+              NSArray *audioTracks = [asset.tracks filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id object, NSDictionary *bindings) {
+                if ([[object mediaType] isEqualToString:AVMediaTypeVideo])
+                {
+                  for (id formatDescription in [object formatDescriptions])
+                  {
+                    CMFormatDescriptionRef desc = (__bridge CMFormatDescriptionRef)formatDescription;
+                    CMVideoCodecType codec = CMFormatDescriptionGetMediaSubType(desc);
+                    NSString* codecString = [NSString stringWithCString:(const char *)FourCC2Str(codec) encoding:NSUTF8StringEncoding];
+                    [video setObject:codecString forKey:@"codec"];
+                  }
+                }
+                  return [object mediaType] == AVMediaTypeAudio;
+              }]];
+          
+              [result setObject:video forKey:@"video"];
+              [result setObject:@(audioTracks.count > 0) forKey:@"hasAudio"];
+              
               [asset loadValuesAsynchronouslyForKeys:keys completionHandler:^{
                 // string keys
                 for (NSString *key in [self metadatas]) {
