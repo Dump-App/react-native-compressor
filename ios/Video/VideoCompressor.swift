@@ -207,7 +207,7 @@ func makeValidUri(filePath: String) -> String {
   
   func compressVideo(url: URL, options: [String: Any], onProgress: @escaping (Float) -> Void,  onCompletion: @escaping (URL) -> Void, onFailure: @escaping (Error) -> Void){
       ImageCompressor.getAbsoluteVideoPath(url.absoluteString) { absoluteVideoPath in
-        var minimumFileSizeForCompress:Double=16.0;
+        var minimumFileSizeForCompress:Double=1.0;
         let videoURL = URL(string: absoluteVideoPath!)
         let fileSize=self.getfileSize(forURL: videoURL!);
           if((options["minimumFileSizeForCompress"]) != nil)
@@ -351,6 +351,9 @@ func makeValidUri(filePath: String) -> String {
         tmpURL = URL(string:makeValidUri(filePath: tmpURL.absoluteString))!
         
         let exporter = NextLevelSessionExporter(withAsset: asset)
+        let inputDuration = CMTimeGetSeconds(asset.duration)
+        let maxVideoDurationInSeconds = inputDuration > 60.0 ? 60.0 : inputDuration
+        exporter.timeRange = CMTimeRange(start: CMTime.zero, duration: CMTime(seconds: maxVideoDurationInSeconds, preferredTimescale: 1))
         exporter.outputURL = tmpURL
         exporter.outputFileType = AVFileType.mp4
         
@@ -364,7 +367,7 @@ func makeValidUri(filePath: String) -> String {
           AVVideoWidthKey:  resultWidth,
           AVVideoHeightKey:  resultHeight,
           AVVideoScalingModeKey: AVVideoScalingModeResizeAspectFill,
-          AVVideoCompressionPropertiesKey: compressionDict
+          AVVideoCompressionPropertiesKey: compressionDict,
         ]
         exporter.audioOutputConfiguration = [
           AVFormatIDKey: kAudioFormatMPEG4AAC,

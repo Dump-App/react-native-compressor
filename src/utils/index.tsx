@@ -49,6 +49,10 @@ export const getVideoMetaData: any = (path: string) => {
   return Compressor.getVideoMetaData(path);
 };
 
+export const getVideoThumnail: any = (path: string): Promise<string> => {
+  return Compressor.getVideoThumnail(path);
+};
+
 const isValidUrl = (url: string) =>
   /^(?:\w+:)?\/\/([^\s\.]+\.\S{2}|localhost[\:?\d]*)\S*$/.test(url);
 
